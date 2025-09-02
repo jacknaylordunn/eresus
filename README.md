@@ -1,2 +1,16 @@
-# eresus
-A simple, intuitive, and robust single-page web application designed for paramedics and ambulance staff to accurately log and time events during an out-of-hospital cardiac arrest (OHCA). The app functions as a real-time scribe, minimizing cognitive load and allowing clinicians to focus on patient care.
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/drive/1MEwFi9ecEEqdcs0PseLdPdA3b_OYy2Gz?showAssistant=true&showCode=true&showTreeView=true&showPreview=true&resourceKey=
+
+## Run Locally
+
+**Prerequisites:**  Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
