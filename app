@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>eResus - Cardiac Arrest Scribe</title>
+
+    <!-- PWA and Mobile App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#111827">
+    <link rel="manifest" href='data:application/manifest+json;base64,ewogICJuYW1lIjogImVSZXN1cyAtIENhcmRpYWMgQXJyZXN0IFNjcmliZSIsCiAgInNob3J0X25hbWUiOiAiZVJlc3VzIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMxMTE4MjciLAogICJ0aGVtZV9jb2xvciI6ICIjMTExODI3IiwKICAiZGVzY3JpcHRpb24iOiAiQSB0b29sIGZvciBwYXJhbWVkaWNzIHRvIGxvZyBvdXQtb2YtaG9zcGl0YWwgY2FyZGlhYyBhcnJlc3RzLiIsCiAgImljb25zIjogWwogICAgewogICAgICAic3JjIjogImRhdGE6aW1hZ2Uvc3ZnK3htbCwlM0NzdmcgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJyB2aWV3Qm94PScwIDAgMTAwIDEwMCclM0UlM0NyZWN0IHdpZHRoPScxMDAnIGhlaWdodD0nMTAwJyByeD0nMjAnIGZpbGw9JyNjYzAwMDAnLzUzRSUzQ3BhdGggZD0nTTIwIDUwIEggMzUgTCA0NSA0MCA1IDUgNjAgTCA3MCA1MCBIIDgwJyBzdHJva2U9J3doaXRlJyBzdHJva2Utd2lkdGg9JzgnIGZpbGw9J25vbmUnIHN0cm9rZS1saW5lY2FwPSdyb3VuZCcgc3Ryb2tlLWxpbmVqb2luPSdyb3VuZCcvJTNFJTNDL3N2Zz4iLAogICAgICAic2l6ZXMiOiAiMTkyeDE5MiA1MTJ4NTEyIiwKICAgICAgInR5cGUiOiAiaW1hZ2Uvc3ZnK3htbCIKICAgIH0KICBdCn0='>
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23cc0000'/%3E%3Cpath d='M20 50 H 35 L 45 40 L 55 60 L 70 50 H 80' stroke='white' stroke-width='8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20 50 H 35 L 45 40 L 55 60 L 70 50 H 80' stroke='%23cc0000' stroke-width='10' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+
+    <!-- Tailwind CSS from CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+      /* Simple scrollbar styling for a cleaner look in dark mode */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: #1f2937; } /* gray-800 */
+      ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; } /* gray-600 */
+      ::-webkit-scrollbar-thumb:hover { background: #6b7280; } /* gray-500 */
+    </style>
+</head>
+<body class="bg-gray-900">
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+
+    <!-- All React Application Code -->
+    <script type="module">
+        import React, { useReducer, useEffect, useRef, useState } from 'https://esm.sh/react@18.2.0';
+        import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
+
+        // --- TYPES AND CONSTANTS (from types.ts) ---
+        const REVERSIBLE_CAUSES = {
+            Hypoxia: false,
+            Hypovolemia: false,
+            'Hypo/Hyperkalaemia': false,
+            Hypothermia: false,
+            Thrombosis: false,
+            Tamponade: false,
+            Toxins: false,
+            'Tension Pneumothorax': false,
+        };
+
+        const POST_ROSC_TASKS = {
+            'Optimise Ventilation & Oxygenation': false,
+            '12-Lead ECG': false,
+            'Treat Hypotension (SBP < 90)': false,
+            'Check Blood Glucose': false,
+            'Consider Temperature Control': false,
+            'Identify & Treat Causes': false,
+        };
+        
+        // --- CORE APPLICATION LOGIC (from App.tsx) ---
+
+        // --- ICONS ---
+        const BoltIcon = () => React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', className: 'h-6 w-6 mr-2', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M13 10V3L4 14h7v7l9-11h-7z' }));
+        const SyringeIcon = () => React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', className: 'h-6 w-6 mr-2', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', strokeWidth: "1.5" }, React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M21 10l-3.3-3.3-2.4 2.4-1.4-1.4 2.4-2.4L13 2l-1 1-7 7-3 8 8-3 7-7 1-1z M13 9l2 2' }));
+        const HeartPulseIcon = () => React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', className: 'h-6 w-6 mr-2', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z' }));
+        const StopIcon = () => React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', className: 'h-6 w-6 mr-2', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M21 12a9 9 0 11-18 0 9 9 0 0118 0z' }), React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M9 10h6v4H9z' }));
+        const MusicNoteIcon = () => React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', className: 'h-8 w-8', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z' }));
+        const CheckCircleIcon = ({ checked }) => React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', className: `h-6 w-6 mr-3 flex-shrink-0 ${checked ? 'text-green-500' : 'text-slate-600'}`, fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, checked ? React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' }) : React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z' }));
+        const AirwayIcon = () => React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', className: 'h-6 w-6 mr-2', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', strokeWidth: "1.5" }, React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M6 18a8 8 0 01-1.3-15.9A8 8 0 0118 12h-6' }));
+        const LungsIcon = () => React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', className: 'h-6 w-6 mr-2', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', strokeWidth: "1.5" }, React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M6 8a4 4 0 014-4h4a4 4 0 014 4v8a4 4 0 01-4 4h-1a3 3 0 00-3 3v0a3 3 0 00-3-3h-1a4 4 0 01-4-4V8z M4 16h2.5l1-2 2 4 2-6 1.5 4H18' }));
+
+        // --- CONSTANTS ---
+        const CPR_CYCLE_SECONDS = 120;
+        const ADRENALINE_INTERVAL_SECONDS = 240; // 4 minutes
+        const METRONOME_BPM = 110;
+
+        // --- UTILITY FUNCTIONS ---
+        const formatTime = (timeInSeconds) => {
+            const minutes = Math.floor(timeInSeconds / 60).toString().padStart(2, '0');
+            const seconds = (timeInSeconds % 60).toString().padStart(2, '0');
+            return `${minutes}:${seconds}`;
+        };
+
+        const triggerHapticFeedback = () => {
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        };
+
+        // --- STATE MANAGEMENT (useReducer) ---
+        const initialState = {
+            arrestState: 'PENDING',
+            startTime: null,
+            masterTime: 0,
+            cprTime: CPR_CYCLE_SECONDS,
+            cprCycleStartTime: 0,
+            lastAdrenalineTime: null,
+            events: [],
+            adrenalineCount: 0,
+            amiodaroneCount: 0,
+            lidocaineCount: 0,
+            shockCount: 0,
+            airwayPlaced: false,
+            uiState: 'default',
+            metronomeOn: false,
+            reversibleCauses: { ...REVERSIBLE_CAUSES },
+            postRoscTasks: { ...POST_ROSC_TASKS },
+            antiarrhythmicGiven: null,
+        };
+
+        const appReducer = (state, action) => {
+            if (state.arrestState === 'ENDED' && !['RESET', 'TOGGLE_METRONOME'].includes(action.type)) return state;
+            if (state.arrestState === 'PENDING' && !['START_ARREST', 'RESET'].includes(action.type)) return state;
+            
+            const newEvent = (message, type) => ({ timestamp: state.masterTime, message, type });
+
+            switch (action.type) {
+                case 'START_ARREST':
+                    const startTime = Date.now();
+                    return { 
+                        ...initialState,
+                        arrestState: 'ACTIVE', 
+                        startTime: startTime,
+                        events: [newEvent(`Arrest Started at ${new Date(startTime).toLocaleTimeString()}`, 'status')] 
+                    };
+                case 'TICK': {
+                    if (!state.startTime || (state.arrestState !== 'ACTIVE' && state.arrestState !== 'ROSC')) return state;
+                    
+                    const newMasterTime = Math.floor((Date.now() - state.startTime) / 1000);
+                    let newCprTime = CPR_CYCLE_SECONDS - (newMasterTime - state.cprCycleStartTime);
+                    let events = state.events;
+                    let cprCycleStartTime = state.cprCycleStartTime;
+
+                    if (newCprTime < 0 && state.arrestState === 'ACTIVE') {
+                        newCprTime = CPR_CYCLE_SECONDS;
+                        cprCycleStartTime = newMasterTime;
+                        events = [...state.events, newEvent('CPR Cycle Complete. New cycle started.', 'cpr')];
+                    }
+                    return { ...state, masterTime: newMasterTime, cprTime: newCprTime, events, cprCycleStartTime };
+                }
+                case 'START_RHYTHM_ANALYSIS':
+                    return { ...state, uiState: 'analyzing', events: [...state.events, newEvent('Rhythm Analysis Paused', 'analysis')] };
+                case 'LOG_RHYTHM_TYPE':
+                    const isShockable = action.payload === 'VF / VT';
+                    return { 
+                        ...state, 
+                        uiState: isShockable ? 'shock_advised' : 'default', 
+                        events: [...state.events, newEvent(`Rhythm is ${action.payload}`, 'rhythm')]
+                    };
+                case 'DELIVER_SHOCK':
+                    const newShockCount = state.shockCount + 1;
+                    return { ...state, shockCount: newShockCount, uiState: 'default', cprCycleStartTime: state.masterTime, events: [...state.events, newEvent(`Shock ${newShockCount} Delivered. Resuming CPR.`, 'shock')] };
+                case 'LOG_ADRENALINE':
+                    const newAdrenalineCount = state.adrenalineCount + 1;
+                    return { ...state, adrenalineCount: newAdrenalineCount, lastAdrenalineTime: state.masterTime, events: [...state.events, newEvent(`Adrenaline (1mg) Given - Dose ${newAdrenalineCount}`, 'drug')] };
+                case 'LOG_AMIODARONE':
+                    if (state.amiodaroneCount >= 2 || state.antiarrhythmicGiven === 'lidocaine') return state;
+                    const newAmiodaroneCount = state.amiodaroneCount + 1;
+                    const amioMessage = newAmiodaroneCount === 1 ? 'Amiodarone (300mg) Given - Dose 1' : 'Amiodarone (150mg) Given - Dose 2';
+                    return { ...state, amiodaroneCount: newAmiodaroneCount, antiarrhythmicGiven: 'amiodarone', events: [...state.events, newEvent(amioMessage, 'drug')] };
+                case 'LOG_LIDOCAINE':
+                    if (state.lidocaineCount >= 2 || state.antiarrhythmicGiven === 'amiodarone') return state;
+                    const newLidocaineCount = state.lidocaineCount + 1;
+                    const lidoMessage = `Lidocaine (100mg) Given - Dose ${newLidocaineCount}`;
+                    return { ...state, lidocaineCount: newLidocaineCount, antiarrhythmicGiven: 'lidocaine', events: [...state.events, newEvent(lidoMessage, 'drug')] };
+                case 'LOG_AIRWAY':
+                    if (state.airwayPlaced) return state;
+                    return { ...state, airwayPlaced: true, events: [...state.events, newEvent('Advanced Airway Placed', 'airway')] };
+                case 'LOG_ETCO2':
+                    return { ...state, events: [...state.events, newEvent(`ETCO2: ${action.payload} mmHg`, 'etco2')] };
+                case 'LOG_ROSC':
+                    return { ...state, arrestState: 'ROSC', events: [...state.events, newEvent('Return of Spontaneous Circulation (ROSC)', 'status')] };
+                case 'RE_ARREST':
+                    return { ...state, arrestState: 'ACTIVE', cprCycleStartTime: state.masterTime, events: [...state.events, newEvent('Patient Re-Arrested. CPR Resumed.', 'status')]};
+                case 'END_ARREST':
+                    const endTime = new Date();
+                    return { ...state, arrestState: 'ENDED', events: [...state.events, newEvent(`Arrest Ended (Patient Deceased) at ${endTime.toLocaleTimeString()}`, 'status')] };
+                case 'TOGGLE_METRONOME':
+                    return { ...state, metronomeOn: !state.metronomeOn };
+                case 'TOGGLE_REVERSIBLE_CAUSE':
+                    const updatedCauses = { ...state.reversibleCauses, [action.payload]: !state.reversibleCauses[action.payload] };
+                    const causeMessage = `Reversible Cause: ${action.payload} ${updatedCauses[action.payload] ? 'considered/excluded' : 'unchecked'}.`;
+                    return { ...state, reversibleCauses: updatedCauses, events: [...state.events, newEvent(causeMessage, 'cause')] };
+                case 'TOGGLE_POST_ROSC_TASK':
+                    const updatedTasks = { ...state.postRoscTasks, [action.payload]: !state.postRoscTasks[action.payload] };
+                    const taskMessage = `Post-ROSC Care: ${action.payload} ${updatedTasks[action.payload] ? 'completed' : 'unchecked'}.`;
+                    return { ...state, postRoscTasks: updatedTasks, events: [...state.events, newEvent(taskMessage, 'status')] };
+                case 'RESET':
+                    return { ...initialState, reversibleCauses: { ...REVERSIBLE_CAUSES }, postRoscTasks: { ...POST_ROSC_TASKS }};
+                default:
+                    return state;
+            }
+        };
+
+        // --- UI HELPER COMPONENTS ---
+        const getLogColorClass = (type) => {
+            switch (type) {
+                case 'status': return 'text-green-400';
+                case 'cpr': return 'text-cyan-400';
+                case 'shock': return 'text-amber-400';
+                case 'analysis': return 'text-blue-400';
+                case 'rhythm': return 'text-purple-400';
+                case 'drug': return 'text-orange-400';
+                case 'airway': return 'text-indigo-400';
+                case 'etco2': return 'text-teal-400';
+                case 'cause': return 'text-slate-400';
+                default: return 'text-slate-300';
+            }
+        };
+
+        const ArrestStatusIndicator = ({ status }) => {
+            const statusStyles = {
+                PENDING: { text: 'PENDING', className: 'bg-slate-500' },
+                ACTIVE: { text: 'ACTIVE', className: 'bg-red-500 animate-pulse' },
+                ROSC: { text: 'ROSC', className: 'bg-green-500' },
+                ENDED: { text: 'ENDED', className: 'bg-slate-700' },
+            };
+            const { text, className } = statusStyles[status];
+            return React.createElement('div', { className: 'flex items-center gap-2' }, React.createElement('span', { className: `px-2 py-1 text-xs font-bold tracking-wider text-white rounded ${className}` }, text));
+        };
+
+        const CircularProgress = ({ cprTime, cycleEnded }) => {
+            const percentage = (cprTime / CPR_CYCLE_SECONDS) * 100;
+            const radius = 56;
+            const circumference = 2 * Math.PI * radius;
+            const strokeDashoffset = cprTime >= 0 ? circumference - (percentage / 100) * circumference : circumference;
+            const flashClass = cycleEnded ? 'animate-ping-once' : '';
+            return React.createElement('div', { className: `relative w-40 h-40 ${flashClass}` }, 
+                React.createElement('svg', { className: 'w-full h-full transform -rotate-90', viewBox: '0 0 120 120' }, 
+                    React.createElement('circle', { cx: '60', cy: '60', r: radius, strokeWidth: '8', className: 'text-slate-700', stroke: 'currentColor', fill: 'transparent' }),
+                    React.createElement('circle', { cx: '60', cy: '60', r: radius, strokeWidth: '8', className: 'text-cyan-400', stroke: 'currentColor', fill: 'transparent', strokeLinecap: 'round', strokeDasharray: circumference, strokeDashoffset: strokeDashoffset, style: { transition: 'stroke-dashoffset 0.5s linear' } })
+                ),
+                React.createElement('div', { className: 'absolute inset-0 flex flex-col items-center justify-center', 'aria-live': 'polite' },
+                    React.createElement('span', { className: 'text-4xl font-mono text-cyan-400' }, formatTime(Math.max(0, cprTime))),
+                    React.createElement('span', { className: 'text-xs text-slate-400 tracking-wider' }, 'CPR CYCLE')
+                )
+            );
+        };
+
+        const AdrenalineTimer = ({ masterTime, lastAdrenalineTime }) => {
+            if (lastAdrenalineTime === null) return null;
+            const timeSince = masterTime - lastAdrenalineTime;
+            if (timeSince > ADRENALINE_INTERVAL_SECONDS) return null;
+            const timeRemaining = ADRENALINE_INTERVAL_SECONDS - timeSince;
+            const percentage = (timeRemaining / ADRENALINE_INTERVAL_SECONDS) * 100;
+            return React.createElement('div', { className: 'bg-orange-900/50 rounded-lg p-3 text-center' },
+                React.createElement('div', { className: 'text-sm font-semibold text-orange-300' }, 'Next Adrenaline Due:'),
+                React.createElement('div', { className: 'text-2xl font-mono text-orange-300 my-1' }, formatTime(timeRemaining)),
+                React.createElement('div', { className: 'w-full bg-orange-800/70 rounded-full h-2.5' }, React.createElement('div', { className: 'bg-orange-500 h-2.5 rounded-full', style: { width: `${percentage}%` } }))
+            );
+        };
+
+        const ActionButton = ({ children, className = '', disabled = false, largeText = false, ...props }) => {
+            const finalClassName = `w-full h-20 flex flex-col items-center justify-center p-2 text-center rounded-xl shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:bg-slate-700 ${largeText ? 'text-xl' : 'text-md'} font-semibold ${className}`;
+            const handleClick = (e) => {
+                if (!disabled && props.onClick) {
+                    triggerHapticFeedback();
+                    props.onClick(e);
+                }
+            };
+            return React.createElement('button', { ...props, onClick: handleClick, disabled, className: finalClassName }, children);
+        };
+
+        const Checklist = ({ title, items, onToggle }) => {
+            const [isOpen, setIsOpen] = useState(true);
+            return React.createElement('div', { className: 'bg-gray-800/50 rounded-lg p-4' },
+                React.createElement('button', { onClick: () => setIsOpen(!isOpen), className: 'w-full text-left text-lg font-bold flex justify-between items-center text-slate-200' },
+                    React.createElement('span', null, title),
+                    React.createElement('span', { className: `transform transition-transform ${isOpen ? 'rotate-180' : ''}` }, '▼')
+                ),
+                isOpen && React.createElement('div', { className: 'mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3' },
+                    Object.entries(items).map(([item, isChecked]) => (
+                        React.createElement('div', { key: item, onClick: () => onToggle(item), className: 'flex items-center cursor-pointer p-2 -m-2 rounded-md hover:bg-gray-700/50' },
+                            React.createElement(CheckCircleIcon, { checked: isChecked }),
+                            React.createElement('span', { className: `transition-colors ${isChecked ? 'line-through text-slate-500' : 'text-slate-300'}` }, item)
+                        )
+                    ))
+                )
+            );
+        };
+        
+        const SummaryModal = ({ events, onClose, masterTime }) => {
+            const summaryText = `eResus Event Summary\nTotal Arrest Time: ${formatTime(masterTime)}\n\n--- Event Log ---\n${events.map(e => `[${formatTime(e.timestamp)}] ${e.message}`).join('\n')}`;
+            const [copied, setCopied] = useState(false);
+
+            const handleCopy = () => {
+                navigator.clipboard.writeText(summaryText).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                });
+            };
+
+            return React.createElement('div', { className: 'fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50' },
+                React.createElement('div', { className: 'bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-full flex flex-col border border-gray-700' },
+                    React.createElement('div', { className: 'p-4 border-b border-gray-700 flex justify-between items-center' },
+                        React.createElement('h2', { className: 'text-xl font-bold' }, 'Event Summary'),
+                        React.createElement('button', { onClick: onClose, className: 'text-slate-400 hover:text-white text-2xl' }, '×')
+                    ),
+                    React.createElement('div', { className: 'p-4 overflow-y-auto' },
+                        React.createElement('pre', { className: 'text-sm whitespace-pre-wrap bg-gray-900 p-3 rounded-md text-slate-200' }, summaryText)
+                    ),
+                    React.createElement('div', { className: 'p-4 border-t border-gray-700 flex gap-4' },
+                        React.createElement('button', { onClick: handleCopy, className: 'flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg' }, copied ? 'Copied!' : 'Copy to Clipboard'),
+                        React.createElement('button', { onClick: onClose, className: 'flex-1 bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-4 rounded-lg' }, 'Close')
+                    )
+                )
+            );
+        };
+
+        const ResetModal = ({ events, masterTime, onClose, onReset }) => {
+            const [copied, setCopied] = useState(false);
+            const handleCopyAndReset = () => {
+                const summaryText = `eResus Event Summary\nTotal Arrest Time: ${formatTime(masterTime)}\n\n--- Event Log ---\n${events.map(e => `[${formatTime(e.timestamp)}] ${e.message}`).join('\n')}`;
+                navigator.clipboard.writeText(summaryText).then(() => {
+                    setCopied(true);
+                    setTimeout(() => { onReset(); }, 1000);
+                });
+            };
+            return React.createElement('div', { className: 'fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50' },
+                React.createElement('div', { className: 'bg-gray-800 rounded-lg shadow-xl w-full max-w-sm border border-gray-700 text-center' },
+                    React.createElement('div', { className: 'p-6' },
+                        React.createElement('h2', { className: 'text-xl font-bold' }, 'Reset Arrest Log?'),
+                        React.createElement('p', { className: 'text-slate-400 mt-2' }, 'This action cannot be undone. You can copy the log to your clipboard before resetting.')
+                    ),
+                    React.createElement('div', { className: 'p-4 flex flex-col gap-3 border-t border-gray-700' },
+                        React.createElement('button', { onClick: handleCopyAndReset, disabled: copied, className: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg disabled:opacity-50' }, copied ? 'Copied! Resetting...' : 'Copy Log & Reset'),
+                        React.createElement('button', { onClick: onReset, className: 'w-full bg-red-800/80 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg' }, 'Reset Anyway'),
+                        React.createElement('button', { onClick: onClose, className: 'w-full text-slate-300 hover:bg-gray-700 font-bold py-2 px-4 rounded-lg mt-1' }, 'Cancel')
+                    )
+                )
+            );
+        };
+
+        const EndArrestModal = ({ onClose, onConfirm }) => React.createElement('div', { className: 'fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50' },
+            React.createElement('div', { className: 'bg-gray-800 rounded-lg shadow-xl w-full max-w-sm border border-gray-700 text-center' },
+                React.createElement('div', { className: 'p-6' },
+                    React.createElement('h2', { className: 'text-xl font-bold' }, 'Confirm End of Arrest'),
+                    React.createElement('p', { className: 'text-slate-400 mt-2' }, 'This will log the patient as deceased at the current time. This action is final.')
+                ),
+                React.createElement('div', { className: 'p-4 flex flex-col gap-3 border-t border-gray-700' },
+                    React.createElement('button', { onClick: onConfirm, className: 'w-full bg-red-800/80 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg' }, 'Confirm (Patient Deceased)'),
+                    React.createElement('button', { onClick: onClose, className: 'w-full text-slate-300 hover:bg-gray-700 font-bold py-2 px-4 rounded-lg mt-1' }, 'Cancel')
+                )
+            )
+        );
+        
+        const Etco2Modal = ({ onClose, onConfirm }) => {
+            const [value, setValue] = useState('');
+            const inputRef = useRef(null);
+
+            useEffect(() => {
+                inputRef.current?.focus();
+            }, []);
+            
+            const handleConfirm = () => {
+                if (value.trim()) {
+                    onConfirm(value.trim());
+                }
+            };
+            
+            return React.createElement('div', { className: 'fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50' },
+                React.createElement('div', { className: 'bg-gray-800 rounded-lg shadow-xl w-full max-w-sm border border-gray-700 text-center' },
+                    React.createElement('div', { className: 'p-6' },
+                        React.createElement('h2', { className: 'text-xl font-bold' }, 'Log ETCO2 Value'),
+                        React.createElement('p', { className: 'text-slate-400 mt-2' }, 'Enter the current end-tidal CO2 reading in mmHg.'),
+                        React.createElement('input', { ref: inputRef, type: 'number', value, onChange: (e) => setValue(e.target.value), onKeyDown: (e) => e.key === 'Enter' && handleConfirm(), className: 'mt-4 w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-center text-xl', placeholder: 'e.g., 35' })
+                    ),
+                    React.createElement('div', { className: 'p-4 flex gap-3 border-t border-gray-700' },
+                        React.createElement('button', { onClick: onClose, className: 'flex-1 text-slate-300 hover:bg-gray-700 font-bold py-3 px-4 rounded-lg' }, 'Cancel'),
+                        React.createElement('button', { onClick: handleConfirm, className: 'flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg' }, 'Log Value')
+                    )
+                )
+            );
+        };
+
+        const ActionSection = ({ title, children }) => React.createElement('div', { className: 'bg-gray-800/50 rounded-lg p-3' },
+            React.createElement('h2', { className: 'text-sm font-bold mb-3 text-slate-400 tracking-wider uppercase' }, title),
+            React.createElement('div', { className: 'grid grid-cols-2 gap-3' }, children)
+        );
+
+        // --- MAIN APP COMPONENT ---
+        const App = () => {
+            const [state, dispatch] = useReducer(appReducer, initialState);
+            const audioCtxRef = useRef(null);
+            const metronomeIntervalRef = useRef(null);
+            const timerIdRef = useRef(null);
+            const [showSummary, setShowSummary] = useState(false);
+            const [showResetModal, setShowResetModal] = useState(false);
+            const [showEndArrestModal, setShowEndArrestModal] = useState(false);
+            const [showEtco2Modal, setShowEtco2Modal] = useState(false);
+            const [cprCycleEnded, setCprCycleEnded] = useState(false);
+            const logContainerRef = useRef(null);
+
+            useEffect(() => {
+                if (timerIdRef.current) clearInterval(timerIdRef.current);
+                if (state.arrestState === 'ACTIVE' || state.arrestState === 'ROSC') {
+                    timerIdRef.current = window.setInterval(() => dispatch({ type: 'TICK' }), 1000);
+                }
+                return () => { if (timerIdRef.current) clearInterval(timerIdRef.current); };
+            }, [state.arrestState]);
+
+            useEffect(() => {
+                if (state.metronomeOn) {
+                    audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                    const playBeep = () => {
+                        if (!audioCtxRef.current) return;
+                        const oscillator = audioCtxRef.current.createOscillator();
+                        const gainNode = audioCtxRef.current.createGain();
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(880, audioCtxRef.current.currentTime);
+                        gainNode.gain.setValueAtTime(0.3, audioCtxRef.current.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtxRef.current.currentTime + 0.1);
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioCtxRef.current.destination);
+                        oscillator.start();
+                        oscillator.stop(audioCtxRef.current.currentTime + 0.1);
+                    };
+                    const intervalTime = (60 / METRONOME_BPM) * 1000;
+                    metronomeIntervalRef.current = window.setInterval(playBeep, intervalTime);
+                }
+                return () => {
+                    if (metronomeIntervalRef.current) clearInterval(metronomeIntervalRef.current);
+                    if (audioCtxRef.current?.state !== 'closed') audioCtxRef.current?.close().catch(console.error);
+                };
+            }, [state.metronomeOn]);
+
+            useEffect(() => {
+                if (logContainerRef.current) logContainerRef.current.scrollTop = 0;
+            }, [state.events]);
+
+            useEffect(() => {
+                if (state.cprTime === CPR_CYCLE_SECONDS && state.arrestState === 'ACTIVE' && state.masterTime > 0) {
+                    setCprCycleEnded(true);
+                    setTimeout(() => setCprCycleEnded(false), 1000);
+                }
+            }, [state.cprTime, state.arrestState, state.masterTime]);
+
+            const handleReset = () => {
+                setShowResetModal(false);
+                dispatch({ type: 'RESET' });
+            };
+
+            const handleEndArrest = () => {
+                setShowEndArrestModal(false);
+                dispatch({ type: 'END_ARREST' });
+            };
+            
+            const handleLogEtco2 = (value) => {
+                dispatch({ type: 'LOG_ETCO2', payload: value });
+                setShowEtco2Modal(false);
+            };
+
+            const isActionDisabled = state.arrestState !== 'ACTIVE';
+
+            const renderActiveArrestActions = () => {
+                switch (state.uiState) {
+                    case 'analyzing':
+                        return React.createElement(ActionSection, { title: 'Select Rhythm' },
+                            React.createElement(ActionButton, { onClick: () => dispatch({ type: 'LOG_RHYTHM_TYPE', payload: 'VF / VT' }), className: 'bg-amber-500 hover:bg-amber-600 text-black col-span-2' }, 'VF / VT (Shockable)'),
+                            React.createElement(ActionButton, { onClick: () => dispatch({ type: 'LOG_RHYTHM_TYPE', payload: 'PEA' }), className: 'bg-slate-600 hover:bg-slate-500 text-white' }, 'PEA'),
+                            React.createElement(ActionButton, { onClick: () => dispatch({ type: 'LOG_RHYTHM_TYPE', payload: 'Asystole' }), className: 'bg-slate-600 hover:bg-slate-500 text-white' }, 'Asystole')
+                        );
+                    case 'shock_advised':
+                        return React.createElement(ActionSection, { title: 'Shock' }, React.createElement(ActionButton, { onClick: () => dispatch({ type: 'DELIVER_SHOCK' }), className: 'bg-amber-500 hover:bg-amber-600 text-black col-span-2' }, React.createElement(BoltIcon), 'Deliver Shock'));
+                    default:
+                        return React.createElement(React.Fragment, null,
+                            React.createElement(ActionSection, { title: 'Rhythm & Shock' }, React.createElement(ActionButton, { onClick: () => dispatch({ type: 'START_RHYTHM_ANALYSIS' }), className: 'bg-blue-600 hover:bg-blue-700 text-white col-span-2' }, React.createElement(BoltIcon), ' Analyse Rhythm')),
+                            React.createElement(ActionSection, { title: 'Medications' },
+                                React.createElement(ActionButton, { onClick: () => dispatch({ type: 'LOG_ADRENALINE' }), className: 'bg-orange-500 hover:bg-orange-600 text-white col-span-2' }, React.createElement(SyringeIcon), ' Adrenaline'),
+                                React.createElement(ActionButton, { onClick: () => dispatch({ type: 'LOG_AMIODARONE' }), className: 'bg-purple-600 hover:bg-purple-700 text-white', disabled: state.shockCount < 3 || state.amiodaroneCount >= 2 || state.antiarrhythmicGiven === 'lidocaine' }, React.createElement(SyringeIcon), ' Amiodarone'),
+                                React.createElement(ActionButton, { onClick: () => dispatch({ type: 'LOG_LIDOCAINE' }), className: 'bg-pink-600 hover:bg-pink-700 text-white', disabled: state.shockCount < 3 || state.lidocaineCount >= 2 || state.antiarrhythmicGiven === 'amiodarone' }, React.createElement(SyringeIcon), ' Lidocaine')
+                            ),
+                            React.createElement(ActionSection, { title: 'Procedures' },
+                                React.createElement(ActionButton, { onClick: () => dispatch({ type: 'LOG_AIRWAY' }), className: 'bg-indigo-600 hover:bg-indigo-700 text-white', disabled: state.airwayPlaced }, React.createElement(AirwayIcon), ' Advanced Airway'),
+                                React.createElement(ActionButton, { onClick: () => setShowEtco2Modal(true), className: 'bg-teal-600 hover:bg-teal-700 text-white' }, React.createElement(LungsIcon), ' Log ETCO2')
+                            ),
+                            React.createElement(ActionSection, { title: 'Patient Status' },
+                                React.createElement(ActionButton, { onClick: () => dispatch({ type: 'LOG_ROSC' }), className: 'bg-green-600 hover:bg-green-700 text-white' }, React.createElement(HeartPulseIcon), ' ROSC'),
+                                React.createElement(ActionButton, { onClick: () => setShowEndArrestModal(true), className: 'bg-red-800 hover:bg-red-700 text-white', disabled: state.arrestState === 'ENDED' }, React.createElement(StopIcon), ' End Arrest')
+                            )
+                        );
+                }
+            };
+            
+            return React.createElement('div', { className: 'bg-gray-900 text-slate-100 min-h-screen font-sans flex flex-col' },
+                React.createElement('style', null, '.animate-ping-once { animation: ping 1s cubic-bezier(0, 0, 0.2, 1); }'),
+                showSummary && React.createElement(SummaryModal, { events: state.events, masterTime: state.masterTime, onClose: () => setShowSummary(false) }),
+                showResetModal && React.createElement(ResetModal, { events: state.events, masterTime: state.masterTime, onClose: () => setShowResetModal(false), onReset: handleReset }),
+                showEndArrestModal && React.createElement(EndArrestModal, { onClose: () => setShowEndArrestModal(false), onConfirm: handleEndArrest }),
+                showEtco2Modal && React.createElement(Etco2Modal, { onClose: () => setShowEtco2Modal(false), onConfirm: handleLogEtco2 }),
+                React.createElement('header', { className: 'sticky top-0 bg-gray-900/80 backdrop-blur-sm p-4 flex justify-between items-start shadow-lg z-10 border-b border-gray-800' },
+                    React.createElement('div', null,
+                        React.createElement('h1', { className: 'text-xl font-bold text-slate-200' }, 'eResus'),
+                        React.createElement('div', { className: 'mt-1' }, React.createElement(ArrestStatusIndicator, { status: state.arrestState }))
+                    ),
+                    React.createElement('div', { className: 'text-right' },
+                        React.createElement('div', { 'aria-live': 'polite', className: `text-6xl font-mono tracking-tight ${state.arrestState === 'ROSC' ? 'text-green-400' : 'text-amber-400'}` }, formatTime(state.masterTime)),
+                        state.startTime && React.createElement('div', { className: 'flex justify-end items-baseline gap-x-4 gap-y-1 flex-wrap mt-1' },
+                            React.createElement('div', { className: 'text-xs text-slate-400 font-semibold tracking-wider' }, 'SHOCKS: ', React.createElement('span', { className: 'text-amber-400 font-bold text-sm' }, state.shockCount)),
+                            React.createElement('div', { className: 'text-xs text-slate-400 font-semibold tracking-wider' }, 'ADRENALINE: ', React.createElement('span', { className: 'text-orange-400 font-bold text-sm' }, state.adrenalineCount)),
+                            React.createElement('div', { className: 'text-xs text-slate-400 font-semibold tracking-wider' }, 'AMIODARONE: ', React.createElement('span', { className: 'text-purple-400 font-bold text-sm' }, state.amiodaroneCount)),
+                            React.createElement('div', { className: 'text-xs text-slate-400 font-semibold tracking-wider' }, 'LIDOCAINE: ', React.createElement('span', { className: 'text-pink-400 font-bold text-sm' }, state.lidocaineCount))
+                        ),
+                        React.createElement('div', { className: 'text-xs text-slate-400 h-4 mt-1' }, state.startTime ? `Start Time: ${new Date(state.startTime).toLocaleTimeString()}` : 'Awaiting Start')
+                    )
+                ),
+                React.createElement('main', { className: 'flex-grow p-4 space-y-4' },
+                    state.arrestState === 'PENDING' ?
+                        React.createElement('div', { className: 'h-full flex items-center justify-center' }, React.createElement(ActionButton, { onClick: () => dispatch({ type: 'START_ARREST' }), className: 'bg-red-600 hover:bg-red-700 text-white h-36 text-3xl' }, 'Start Arrest')) :
+                        React.createElement(React.Fragment, null,
+                            React.createElement('div', { className: 'bg-gray-800/50 rounded-lg p-4 flex items-center justify-around' },
+                                React.createElement(CircularProgress, { cprTime: state.cprTime, cycleEnded: cprCycleEnded }),
+                                React.createElement('button', { onClick: () => dispatch({ type: 'TOGGLE_METRONOME' }), className: `p-4 rounded-full transition-colors self-center ${state.metronomeOn ? 'bg-green-600 text-white' : 'bg-gray-700 hover:bg-gray-600 text-slate-300'}` }, React.createElement(MusicNoteIcon))
+                            ),
+                            React.createElement('div', { className: 'space-y-4' },
+                                state.arrestState === 'ACTIVE' && state.lastAdrenalineTime !== null && React.createElement(AdrenalineTimer, { masterTime: state.masterTime, lastAdrenalineTime: state.lastAdrenalineTime }),
+                                state.arrestState === 'ROSC' ? React.createElement(React.Fragment, null,
+                                    React.createElement(ActionSection, { title: 'Patient Status' }, React.createElement(ActionButton, { onClick: () => dispatch({ type: 'RE_ARREST' }), className: 'bg-amber-600 hover:bg-amber-700 text-white col-span-2' }, React.createElement(HeartPulseIcon), ' Patient Re-Arrested')),
+                                    React.createElement(Checklist, { title: 'Post-ROSC Care', items: state.postRoscTasks, onToggle: (task) => dispatch({ type: 'TOGGLE_POST_ROSC_TASK', payload: task }) })
+                                ) : isActionDisabled ? null : renderActiveArrestActions()
+                            ),
+                            state.arrestState !== 'ROSC' && React.createElement(Checklist, { title: "4 H's & 4 T's", items: state.reversibleCauses, onToggle: (cause) => dispatch({ type: 'TOGGLE_REVERSIBLE_CAUSE', payload: cause }) }),
+                            React.createElement('div', { className: 'bg-gray-800/50 rounded-lg p-4 h-72 flex flex-col' },
+                                React.createElement('h2', { className: 'text-lg font-bold mb-2 flex-shrink-0 text-slate-200' }, 'Event Log'),
+                                React.createElement('div', { ref: logContainerRef, className: 'overflow-y-auto flex-grow pr-2' },
+                                    React.createElement('ul', { className: 'space-y-2 text-base' },
+                                        state.events.slice().reverse().map((event, index) => React.createElement('li', { key: index, className: 'flex items-baseline' },
+                                            React.createElement('span', { className: `font-mono mr-3 ${getLogColorClass(event.type)}` }, `[${formatTime(event.timestamp)}]`),
+                                            React.createElement('span', { className: 'text-slate-300' }, event.message)
+                                        ))
+                                    )
+                                )
+                            )
+                        )
+                ),
+                state.arrestState !== 'PENDING' && React.createElement('footer', { className: 'sticky bottom-0 bg-gray-900/80 backdrop-blur-sm p-3 flex gap-3 z-10 border-t border-gray-800' },
+                    React.createElement('button', { onClick: () => setShowSummary(true), className: 'flex-1 bg-slate-600 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-lg disabled:opacity-50', disabled: state.events.length === 0 }, 'View Summary'),
+                    React.createElement('button', { onClick: () => setShowResetModal(true), className: 'flex-1 bg-red-800/80 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg' }, 'Reset')
+                )
+            );
+        };
+
+        // --- RENDER THE APP (from index.tsx) ---
+        const rootElement = document.getElementById('root');
+        if (!rootElement) {
+            throw new Error("Could not find root element to mount to");
+        }
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(React.createElement(React.StrictMode, null, React.createElement(App)));
+
+    </script>
+</body>
+</html>
+
