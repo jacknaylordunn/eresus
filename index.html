@@ -33,6 +33,86 @@
         import React, { useReducer, useEffect, useRef, useState } from 'https://esm.sh/react@18.2.0';
         import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
 
+        // --- SERVICE WORKER REGISTRATION FOR OFFLINE CAPABILITY ---
+        const registerServiceWorker = () => {
+          if ('serviceWorker' in navigator) {
+            const swCode = `
+              const CACHE_NAME = 'eresus-cache-v1';
+              const urlsToCache = [
+                '/',
+                '/index.html',
+                'https://cdn.tailwindcss.com',
+                'https://esm.sh/react@18.2.0',
+                'https://esm.sh/react-dom@18.2.0/client',
+                'https://145955222.fs1.hubspotusercontent-eu1.net/hubfs/145955222/eResus.jpg'
+              ];
+
+              self.addEventListener('install', event => {
+                event.waitUntil(
+                  caches.open(CACHE_NAME)
+                    .then(cache => {
+                      console.log('Opened cache');
+                      // Use addAll with a catch to prevent install failure if one asset fails
+                      return Promise.all(
+                          urlsToCache.map(url => cache.add(url).catch(err => console.warn('Failed to cache:', url, err)))
+                      );
+                    })
+                );
+              });
+
+              self.addEventListener('fetch', event => {
+                event.respondWith(
+                  caches.match(event.request)
+                    .then(response => {
+                      if (response) {
+                        return response; // Serve from cache
+                      }
+                      return fetch(event.request).then(
+                        networkResponse => {
+                           if(!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+                                return networkResponse;
+                           }
+                           const responseToCache = networkResponse.clone();
+                           caches.open(CACHE_NAME).then(cache => {
+                                cache.put(event.request, responseToCache);
+                           });
+                           return networkResponse;
+                        }
+                      );
+                    })
+                );
+              });
+
+              self.addEventListener('activate', event => {
+                const cacheWhitelist = [CACHE_NAME];
+                event.waitUntil(
+                  caches.keys().then(cacheNames => {
+                    return Promise.all(
+                      cacheNames.map(cacheName => {
+                        if (cacheWhitelist.indexOf(cacheName) === -1) {
+                          return caches.delete(cacheName);
+                        }
+                      })
+                    );
+                  })
+                );
+              });
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+
+            navigator.serviceWorker.register(swUrl)
+              .then(registration => {
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+              })
+              .catch(err => {
+                console.log('ServiceWorker registration failed: ', err);
+              });
+          }
+        };
+        
+        registerServiceWorker();
+
         // --- TYPES AND CONSTANTS ---
         const REVERSIBLE_CAUSES = {
             Hypoxia: false,
