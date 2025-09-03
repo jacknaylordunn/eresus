@@ -1,0 +1,16 @@
+{
+  "name": "eResus",
+  "short_name": "eResus",
+  "description": "A simple, intuitive, and robust single-page web application designed for paramedics and ambulance staff to accurately log and time events during an out-of-hospital cardiac arrest (OHCA). The app functions as a real-time scribe, minimizing cognitive load and allowing clinicians to focus on patient care.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

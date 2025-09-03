@@ -1,7 +1,9 @@
+
 import React, { useReducer, useEffect, useRef, useState } from 'react';
+import { GoogleGenAI } from "@google/genai";
 import type { LogEntry, ArrestState, LogEventType, RhythmType } from './types';
 import { REVERSIBLE_CAUSES, POST_ROSC_TASKS } from './types';
-import { BoltIcon, SyringeIcon, HeartPulseIcon, StopIcon, MusicNoteIcon, CheckCircleIcon, AirwayIcon, LungsIcon } from './components/Icons';
+import { BoltIcon, SyringeIcon, HeartPulseIcon, StopIcon, MusicNoteIcon, CheckCircleIcon, AirwayIcon, LungsIcon, SparklesIcon } from './components/Icons';
 
 // --- CONSTANTS ---
 const CPR_CYCLE_SECONDS = 120;
@@ -41,6 +43,7 @@ interface AppState {
   reversibleCauses: Record<string, boolean>;
   postRoscTasks: Record<string, boolean>;
   antiarrhythmicGiven: 'amiodarone' | 'lidocaine' | null;
+  previousState: AppState | null;
 }
 
 type AppAction =
@@ -60,6 +63,7 @@ type AppAction =
   | { type: 'TOGGLE_METRONOME' }
   | { type: 'TOGGLE_REVERSIBLE_CAUSE'; payload: string }
   | { type: 'TOGGLE_POST_ROSC_TASK'; payload: string }
+  | { type: 'UNDO' }
   | { type: 'RESET' };
 
 const initialState: AppState = {
@@ -80,10 +84,11 @@ const initialState: AppState = {
   reversibleCauses: { ...REVERSIBLE_CAUSES },
   postRoscTasks: { ...POST_ROSC_TASKS },
   antiarrhythmicGiven: null,
+  previousState: null,
 };
 
 const appReducer = (state: AppState, action: AppAction): AppState => {
-  if (state.arrestState === 'ENDED' && !['RESET', 'TOGGLE_METRONOME'].includes(action.type)) return state;
+  if (state.arrestState === 'ENDED' && !['RESET', 'TOGGLE_METRONOME', 'UNDO'].includes(action.type)) return state;
   if (state.arrestState === 'PENDING' && !['START_ARREST', 'RESET'].includes(action.type)) return state;
   
   const newEvent = (message: string, type: LogEventType): LogEntry => ({ timestamp: state.masterTime, message, type });
@@ -95,17 +100,25 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
           ...initialState,
           arrestState: 'ACTIVE', 
           startTime: startTime,
-          events: [newEvent(`Arrest Started at ${new Date(startTime).toLocaleTimeString()}`, 'status')] 
+          events: [ { timestamp: 0, message: `Arrest Started at ${new Date(startTime).toLocaleTimeString()}`, type: 'status' } ],
+          previousState: null,
       };
     case 'TICK': {
       if (!state.startTime || (state.arrestState !== 'ACTIVE' && state.arrestState !== 'ROSC')) return state;
       
       const newMasterTime = Math.floor((Date.now() - state.startTime) / 1000);
+      
+      // If ROSC, just update master time and leave CPR time alone.
+      if (state.arrestState === 'ROSC') {
+          return { ...state, masterTime: newMasterTime };
+      }
+
+      // Logic for ACTIVE state
       let newCprTime = CPR_CYCLE_SECONDS - (newMasterTime - state.cprCycleStartTime);
       let events = state.events;
       let cprCycleStartTime = state.cprCycleStartTime;
 
-      if (newCprTime < 0 && state.arrestState === 'ACTIVE') {
+      if (newCprTime < 0) {
         newCprTime = CPR_CYCLE_SECONDS;
         cprCycleStartTime = newMasterTime;
         events = [...state.events, newEvent('CPR Cycle Complete. New cycle started.', 'cpr')];
@@ -113,54 +126,60 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, masterTime: newMasterTime, cprTime: newCprTime, events, cprCycleStartTime };
     }
     case 'START_RHYTHM_ANALYSIS':
-        return { ...state, uiState: 'analyzing', events: [...state.events, newEvent('Rhythm Analysis Paused', 'analysis')] };
+        return { ...state, previousState: state, uiState: 'analyzing', events: [...state.events, newEvent('Rhythm Analysis Paused', 'analysis')] };
     case 'LOG_RHYTHM_TYPE':
-        const isShockable = action.payload === 'VF / VT';
+        if(action.payload === 'ROSC') {
+            return { ...state, previousState: state, uiState: 'default', arrestState: 'ROSC', cprTime: 0, events: [...state.events, newEvent('Return of Spontaneous Circulation (ROSC)', 'status')] };
+        }
+        const isShockable = action.payload === 'VF' || action.payload === 'VT';
         return { 
-            ...state, 
+            ...state,
+            previousState: state,
             uiState: isShockable ? 'shock_advised' : 'default', 
             events: [...state.events, newEvent(`Rhythm is ${action.payload}`, 'rhythm')]
         };
     case 'DELIVER_SHOCK':
       const newShockCount = state.shockCount + 1;
-      return { ...state, shockCount: newShockCount, uiState: 'default', cprCycleStartTime: state.masterTime, events: [...state.events, newEvent(`Shock ${newShockCount} Delivered. Resuming CPR.`, 'shock')] };
+      return { ...state, previousState: state, shockCount: newShockCount, uiState: 'default', cprCycleStartTime: state.masterTime, events: [...state.events, newEvent(`Shock ${newShockCount} Delivered. Resuming CPR.`, 'shock')] };
     case 'LOG_ADRENALINE':
       const newAdrenalineCount = state.adrenalineCount + 1;
-      return { ...state, adrenalineCount: newAdrenalineCount, lastAdrenalineTime: state.masterTime, events: [...state.events, newEvent(`Adrenaline (1mg) Given - Dose ${newAdrenalineCount}`, 'drug')] };
+      return { ...state, previousState: state, adrenalineCount: newAdrenalineCount, lastAdrenalineTime: state.masterTime, events: [...state.events, newEvent(`Adrenaline Given - Dose ${newAdrenalineCount}`, 'drug')] };
     case 'LOG_AMIODARONE':
       if (state.amiodaroneCount >= 2 || state.antiarrhythmicGiven === 'lidocaine') return state;
       const newAmiodaroneCount = state.amiodaroneCount + 1;
-      const amioMessage = newAmiodaroneCount === 1 ? 'Amiodarone (300mg) Given - Dose 1' : 'Amiodarone (150mg) Given - Dose 2';
-      return { ...state, amiodaroneCount: newAmiodaroneCount, antiarrhythmicGiven: 'amiodarone', events: [...state.events, newEvent(amioMessage, 'drug')] };
+      const amioMessage = newAmiodaroneCount === 1 ? 'Amiodarone Given - Dose 1' : 'Amiodarone Given - Dose 2';
+      return { ...state, previousState: state, amiodaroneCount: newAmiodaroneCount, antiarrhythmicGiven: 'amiodarone', events: [...state.events, newEvent(amioMessage, 'drug')] };
     case 'LOG_LIDOCAINE':
       if (state.lidocaineCount >= 2 || state.antiarrhythmicGiven === 'amiodarone') return state;
       const newLidocaineCount = state.lidocaineCount + 1;
-      const lidoMessage = `Lidocaine (100mg) Given - Dose ${newLidocaineCount}`;
-      return { ...state, lidocaineCount: newLidocaineCount, antiarrhythmicGiven: 'lidocaine', events: [...state.events, newEvent(lidoMessage, 'drug')] };
+      const lidoMessage = `Lidocaine Given - Dose ${newLidocaineCount}`;
+      return { ...state, previousState: state, lidocaineCount: newLidocaineCount, antiarrhythmicGiven: 'lidocaine', events: [...state.events, newEvent(lidoMessage, 'drug')] };
     case 'LOG_AIRWAY':
         if (state.airwayPlaced) return state;
-        return { ...state, airwayPlaced: true, events: [...state.events, newEvent('Advanced Airway Placed', 'airway')] };
+        return { ...state, previousState: state, airwayPlaced: true, events: [...state.events, newEvent('Advanced Airway Placed', 'airway')] };
     case 'LOG_ETCO2':
-        return { ...state, events: [...state.events, newEvent(`ETCO2: ${action.payload} mmHg`, 'etco2')] };
+        return { ...state, previousState: state, events: [...state.events, newEvent(`ETCO2: ${action.payload} mmHg`, 'etco2')] };
     case 'LOG_ROSC':
-      return { ...state, arrestState: 'ROSC', events: [...state.events, newEvent('Return of Spontaneous Circulation (ROSC)', 'status')] };
+      return { ...state, previousState: state, uiState: 'default', arrestState: 'ROSC', cprTime: 0, events: [...state.events, newEvent('Return of Spontaneous Circulation (ROSC)', 'status')] };
     case 'RE_ARREST':
-      return { ...state, arrestState: 'ACTIVE', cprCycleStartTime: state.masterTime, events: [...state.events, newEvent('Patient Re-Arrested. CPR Resumed.', 'status')]};
+      return { ...state, previousState: state, arrestState: 'ACTIVE', cprCycleStartTime: state.masterTime, events: [...state.events, newEvent('Patient Re-Arrested. CPR Resumed.', 'status')]};
     case 'END_ARREST':
       const endTime = new Date();
-      return { ...state, arrestState: 'ENDED', events: [...state.events, newEvent(`Arrest Ended (Patient Deceased) at ${endTime.toLocaleTimeString()}`, 'status')] };
+      return { ...state, previousState: state, arrestState: 'ENDED', cprTime: 0, events: [...state.events, newEvent(`Arrest Ended (Patient Deceased) at ${endTime.toLocaleTimeString()}`, 'status')] };
     case 'TOGGLE_METRONOME':
       return { ...state, metronomeOn: !state.metronomeOn };
     case 'TOGGLE_REVERSIBLE_CAUSE':
       const updatedCauses = { ...state.reversibleCauses, [action.payload]: !state.reversibleCauses[action.payload] };
       const causeMessage = `Reversible Cause: ${action.payload} ${updatedCauses[action.payload] ? 'considered/excluded' : 'unchecked'}.`;
-      return { ...state, reversibleCauses: updatedCauses, events: [...state.events, newEvent(causeMessage, 'cause')] };
+      return { ...state, previousState: state, reversibleCauses: updatedCauses, events: [...state.events, newEvent(causeMessage, 'cause')] };
     case 'TOGGLE_POST_ROSC_TASK':
         const updatedTasks = { ...state.postRoscTasks, [action.payload]: !state.postRoscTasks[action.payload] };
         const taskMessage = `Post-ROSC Care: ${action.payload} ${updatedTasks[action.payload] ? 'completed' : 'unchecked'}.`;
-        return { ...state, postRoscTasks: updatedTasks, events: [...state.events, newEvent(taskMessage, 'status')] };
+        return { ...state, previousState: state, postRoscTasks: updatedTasks, events: [...state.events, newEvent(taskMessage, 'status')] };
+    case 'UNDO':
+        return state.previousState || state;
     case 'RESET':
-      return { ...initialState, reversibleCauses: { ...REVERSIBLE_CAUSES }, postRoscTasks: { ...POST_ROSC_TASKS }};
+      return { ...initialState, reversibleCauses: { ...REVERSIBLE_CAUSES }, postRoscTasks: { ...POST_ROSC_TASKS }, previousState: null };
     default:
       return state;
   }
@@ -204,6 +223,7 @@ const CircularProgress: React.FC<{cprTime: number, cycleEnded: boolean}> = ({ cp
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = cprTime >= 0 ? circumference - (percentage / 100) * circumference : circumference;
     const flashClass = cycleEnded ? 'animate-ping-once' : '';
+    const timeColorClass = cprTime > 0 && cprTime <= 10 ? 'text-red-500 animate-pulse' : 'text-cyan-400';
 
     return (
         <div className={`relative w-40 h-40 ${flashClass}`}>
@@ -218,32 +238,27 @@ const CircularProgress: React.FC<{cprTime: number, cycleEnded: boolean}> = ({ cp
                 />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center" aria-live="polite">
-                 <span className="text-4xl font-mono text-cyan-400">{formatTime(Math.max(0, cprTime))}</span>
+                 <span className={`text-4xl font-mono ${timeColorClass}`}>{formatTime(Math.max(0, cprTime))}</span>
                  <span className="text-xs text-slate-400 tracking-wider">CPR CYCLE</span>
             </div>
         </div>
     );
 };
 
-const AdrenalineTimer: React.FC<{masterTime: number, lastAdrenalineTime: number | null}> = ({ masterTime, lastAdrenalineTime }) => {
-    if (lastAdrenalineTime === null) return null;
-    
-    const timeSince = masterTime - lastAdrenalineTime;
-    if (timeSince > ADRENALINE_INTERVAL_SECONDS) return null;
+const AdrenalineTimer: React.FC<{ timeRemaining: number }> = ({ timeRemaining }) => (
+    <div className="bg-gray-700 border border-gray-600 rounded-lg p-3 text-center flex items-center justify-center shadow-md">
+        <SyringeIcon />
+        <span className="text-lg font-semibold text-slate-200 ml-3">Adrenaline due in: <span className="font-mono text-xl">{formatTime(timeRemaining)}</span></span>
+    </div>
+);
 
-    const timeRemaining = ADRENALINE_INTERVAL_SECONDS - timeSince;
-    const percentage = (timeRemaining / ADRENALINE_INTERVAL_SECONDS) * 100;
+const AdrenalineDueWarning: React.FC = () => (
+    <div className="bg-red-600/90 border-2 border-red-500 rounded-lg p-3 text-center animate-pulse flex items-center justify-center shadow-lg">
+        <SyringeIcon />
+        <span className="text-xl font-bold text-white ml-3">Adrenaline Due</span>
+    </div>
+);
 
-    return (
-        <div className="bg-orange-900/50 rounded-lg p-3 text-center">
-            <div className="text-sm font-semibold text-orange-300">Next Adrenaline Due:</div>
-            <div className="text-2xl font-mono text-orange-300 my-1">{formatTime(timeRemaining)}</div>
-            <div className="w-full bg-orange-800/70 rounded-full h-2.5">
-                <div className="bg-orange-500 h-2.5 rounded-full" style={{ width: `${percentage}%` }}></div>
-            </div>
-        </div>
-    );
-}
 
 interface ActionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> { largeText?: boolean }
 
@@ -289,9 +304,50 @@ const Checklist: React.FC<{title: string, items: Record<string, boolean>, onTogg
 const SummaryModal: React.FC<{ events: LogEntry[]; onClose: () => void, masterTime: number }> = ({ events, onClose, masterTime }) => {
     const summaryText = `eResus Event Summary\nTotal Arrest Time: ${formatTime(masterTime)}\n\n--- Event Log ---\n${events.map(e => `[${formatTime(e.timestamp)}] ${e.message}`).join('\n')}`;
     const [copied, setCopied] = useState(false);
+    const [aiSummary, setAiSummary] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const generateSummary = async () => {
+        setIsGenerating(true);
+        setError(null);
+        setAiSummary('');
+        try {
+            if (!process.env.API_KEY) {
+                throw new Error("API key is not configured.");
+            }
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const rawLog = `Total Arrest Time: ${formatTime(masterTime)}\n${events.map(e => `[${formatTime(e.timestamp)}] ${e.message}`).join('\n')}`;
+            const prompt = `You are a highly skilled medical scribe specializing in emergency response. Your task is to convert a raw event log from a cardiac arrest scenario into a clear, concise, and professionally formatted clinical summary. This summary is for patient handover and official records.
+
+Follow these instructions:
+1. Start with a brief overview including the total duration of the arrest.
+2. Chronologically list the key interventions (e.g., CPR cycles, rhythm analysis, shocks delivered, medications administered with dosages).
+3. Mention the final outcome if it's in the log (e.g., ROSC, re-arrest, deceased).
+4. Maintain a clinical and objective tone. Do not add any information not present in the log.
+
+Here is the raw event log:
+---
+${rawLog}
+---
+`;
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+            });
+            setAiSummary(response.text);
+        } catch (e) {
+            console.error(e);
+            const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+            setError(`Failed to generate summary. Please check your API key and network connection. Error: ${errorMessage}`);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(summaryText).then(() => {
+        const textToCopy = aiSummary || summaryText;
+        navigator.clipboard.writeText(textToCopy).then(() => {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         });
@@ -299,20 +355,45 @@ const SummaryModal: React.FC<{ events: LogEntry[]; onClose: () => void, masterTi
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
-            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-full flex flex-col border border-gray-700">
-                <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-700">
+                <div className="p-4 border-b border-gray-700 flex justify-between items-center flex-shrink-0">
                     <h2 className="text-xl font-bold">Event Summary</h2>
                     <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
                 </div>
                 <div className="p-4 overflow-y-auto">
-                    <pre className="text-sm whitespace-pre-wrap bg-gray-900 p-3 rounded-md text-slate-200">{summaryText}</pre>
+                    <div>
+                        <h3 className="text-md font-semibold text-slate-400 mb-2">RAW EVENT LOG</h3>
+                        <pre className="text-sm whitespace-pre-wrap bg-gray-900 p-3 rounded-md text-slate-200">{summaryText}</pre>
+                    </div>
+
+                    {(isGenerating || error || aiSummary) && (
+                        <div className="mt-4 pt-4 border-t border-gray-700">
+                            <h3 className="text-md font-semibold text-slate-400 mb-2 flex items-center">
+                                <SparklesIcon /> AI GENERATED SUMMARY
+                            </h3>
+                            {isGenerating && (
+                                <div className="flex justify-center items-center p-4 text-slate-300">
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Generating...
+                                </div>
+                            )}
+                            {error && <div className="text-red-400 bg-red-900/50 p-3 rounded-md text-sm">{error}</div>}
+                            {aiSummary && <div className="text-slate-200 whitespace-pre-wrap bg-gray-900/50 p-3 rounded-md">{aiSummary}</div>}
+                        </div>
+                    )}
                 </div>
-                <div className="p-4 border-t border-gray-700 flex gap-4">
-                    <button onClick={handleCopy} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                        {copied ? 'Copied!' : 'Copy to Clipboard'}
-                    </button>
+                <div className="p-4 border-t border-gray-700 flex flex-col sm:flex-row-reverse gap-3 flex-shrink-0">
                     <button onClick={onClose} className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-4 rounded-lg">
                         Close
+                    </button>
+                    <button onClick={handleCopy} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                        {copied ? 'Copied!' : 'Copy Summary'}
+                    </button>
+                    <button onClick={generateSummary} disabled={isGenerating} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center disabled:opacity-50">
+                        <SparklesIcon /> {isGenerating ? 'Generating...' : 'Generate AI Summary'}
                     </button>
                 </div>
             </div>
@@ -513,9 +594,11 @@ const App: React.FC = () => {
         case 'analyzing':
             return (
                 <ActionSection title="Select Rhythm">
-                    <ActionButton onClick={() => dispatch({type: 'LOG_RHYTHM_TYPE', payload: 'VF / VT'})} className="bg-amber-500 hover:bg-amber-600 text-black col-span-2">VF / VT (Shockable)</ActionButton>
+                    <ActionButton onClick={() => dispatch({type: 'LOG_RHYTHM_TYPE', payload: 'VF'})} className="bg-amber-500 hover:bg-amber-600 text-black">VF</ActionButton>
+                    <ActionButton onClick={() => dispatch({type: 'LOG_RHYTHM_TYPE', payload: 'VT'})} className="bg-amber-500 hover:bg-amber-600 text-black">VT</ActionButton>
                     <ActionButton onClick={() => dispatch({type: 'LOG_RHYTHM_TYPE', payload: 'PEA'})} className="bg-slate-600 hover:bg-slate-500 text-white">PEA</ActionButton>
                     <ActionButton onClick={() => dispatch({type: 'LOG_RHYTHM_TYPE', payload: 'Asystole'})} className="bg-slate-600 hover:bg-slate-500 text-white">Asystole</ActionButton>
+                    <ActionButton onClick={() => dispatch({type: 'LOG_RHYTHM_TYPE', payload: 'ROSC'})} className="bg-green-600 hover:bg-green-700 text-white col-span-2"><HeartPulseIcon/> ROSC</ActionButton>
                 </ActionSection>
             );
         case 'shock_advised':
@@ -557,6 +640,9 @@ const App: React.FC = () => {
     }
   }
 
+  const timeUntilAdrenalineDue = state.lastAdrenalineTime !== null
+    ? ADRENALINE_INTERVAL_SECONDS - (state.masterTime - state.lastAdrenalineTime)
+    : null;
 
   return (
     <div className="bg-gray-900 text-slate-100 min-h-screen font-sans flex flex-col">
@@ -612,7 +698,11 @@ const App: React.FC = () => {
             </div>
             
             <div className="space-y-4">
-                {state.arrestState === 'ACTIVE' && state.lastAdrenalineTime !== null && <AdrenalineTimer masterTime={state.masterTime} lastAdrenalineTime={state.lastAdrenalineTime} />}
+                {state.arrestState === 'ACTIVE' && timeUntilAdrenalineDue !== null && (
+                    timeUntilAdrenalineDue > 0
+                        ? <AdrenalineTimer timeRemaining={timeUntilAdrenalineDue} />
+                        : <AdrenalineDueWarning />
+                )}
                 
                 {state.arrestState === 'ROSC' ? (
                     <>
@@ -647,6 +737,9 @@ const App: React.FC = () => {
       
       {state.arrestState !== 'PENDING' && (
       <footer className="sticky bottom-0 bg-gray-900/80 backdrop-blur-sm p-3 flex gap-3 z-10 border-t border-gray-800">
+        <button onClick={() => dispatch({ type: 'UNDO' })} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg disabled:opacity-50" disabled={!state.previousState}>
+            Undo
+        </button>
         <button onClick={() => setShowSummary(true)} className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-lg disabled:opacity-50" disabled={state.events.length === 0}>
             View Summary
         </button>
