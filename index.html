@@ -37,10 +37,9 @@
         const registerServiceWorker = () => {
           if ('serviceWorker' in navigator) {
             const swCode = `
-              const CACHE_NAME = 'eresus-cache-v1';
+              const CACHE_NAME = 'eresus-cache-v2';
               const urlsToCache = [
                 '/',
-                '/index.html',
                 'https://cdn.tailwindcss.com',
                 'https://esm.sh/react@18.2.0',
                 'https://esm.sh/react-dom@18.2.0/client',
@@ -54,7 +53,7 @@
                       console.log('Opened cache');
                       // Use addAll with a catch to prevent install failure if one asset fails
                       return Promise.all(
-                          urlsToCache.map(url => cache.add(url).catch(err => console.warn('Failed to cache:', url, err)))
+                          urlsToCache.map(url => cache.add(new Request(url, { mode: 'cors' })).catch(err => console.warn('Failed to cache:', url, err)))
                       );
                     })
                 );
@@ -69,16 +68,19 @@
                       }
                       return fetch(event.request).then(
                         networkResponse => {
-                           if(!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-                                return networkResponse;
+                           // Check if the response is valid and cache it
+                           if(networkResponse && networkResponse.status === 200) {
+                               const responseToCache = networkResponse.clone();
+                               caches.open(CACHE_NAME).then(cache => {
+                                   cache.put(event.request, responseToCache);
+                               });
                            }
-                           const responseToCache = networkResponse.clone();
-                           caches.open(CACHE_NAME).then(cache => {
-                                cache.put(event.request, responseToCache);
-                           });
                            return networkResponse;
                         }
-                      );
+                      ).catch(err => {
+                        // Network fetch failed, which is expected offline.
+                        // The cache match already failed, so there's nothing else to do.
+                      });
                     })
                 );
               });
