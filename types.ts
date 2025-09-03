@@ -1,6 +1,6 @@
 
 export type LogEventType = 'status' | 'cpr' | 'analysis' | 'shock' | 'drug' | 'airway' | 'cause' | 'rhythm' | 'etco2';
-export type RhythmType = 'VF' | 'VT' | 'PEA' | 'Asystole' | 'ROSC';
+export type RhythmType = 'VF / VT' | 'PEA' | 'Asystole';
 
 export interface LogEntry {
   timestamp: number;
