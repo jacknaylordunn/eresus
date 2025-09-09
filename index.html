@@ -10,8 +10,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#111827">
     <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogImVSZXN1cyIsCiAgInNob3J0X25hbWUiOiAiZVJlc3VzIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMxMTE4MjciLAogICJ0aGVtZV9jb2xvciI6ICIjMTEyRDQ2IiwKICAiZGVzY3JpcHRpb24iOiAiQSBjbGluaWNhbCBzY3JpYmUgZm9yIG91dC1vZi1ob3NwaXRhbCBjYXJkaWFjIGFycmVzdHMuIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiaHR0cHM6Ly8xNDU5NTUyMjIuZnMxLmh1YnNwb3R1c2VyY29udGVudC1ldTEubmV0L2h1YmZzLzEIVCQ5NTUyMjIvZUmVzdXMuanBnIiwKICAgICAgInNpemVzIjogIjE5MngxOTIgNTEyeDUxMiIsCiAgICAgICJ0eXBlIjogImltYWdlL2pwZWciCiAgICAgICJ9CiAgXQp9">
-    <link rel="apple-touch-icon" href="https://145955222.fs1.hubspotusercontent-eu1.net/hubfs/145955222/eResus.jpg">
-    <link rel="icon" href="https://145955222.fs1.hubspotusercontent-eu1.net/hubfs/145955222/eResus.jpg">
+    <link rel="apple-touch-icon" href="https://14555222.fs1.hubspotusercontent-eu1.net/hubfs/14555222/eResus.jpg">
+    <link rel="icon" href="https://14555222.fs1.hubspotusercontent-eu1.net/hubfs/14555222/eResus.jpg">
 
     <!-- Tailwind CSS from CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -59,8 +59,9 @@
 
 
         // --- TYPES AND CONSTANTS ---
-        const REVERSIBLE_CAUSES = { Hypoxia: false, Hypovolemia: false, 'Hypo/Hyperkalaemia': false, Hypothermia: 'normothermic', Toxins: false, Tamponade: false, 'Tension Pneumothorax': false, Thrombosis: false };
+        const REVERSIBLE_CAUSES = { Hypoxia: false, Hypovolemia: false, 'Hypo/Hyperkalaemia': false, Hypothermia: false, Toxins: false, Tamponade: false, 'Tension Pneumothorax': false, Thrombosis: false };
         const POST_ROSC_TASKS = { 'Optimise Ventilation & Oxygenation': false, '12-Lead ECG': false, 'Treat Hypotension (SBP < 90)': false, 'Check Blood Glucose': false, 'Consider Temperature Control': false, 'Identify & Treat Causes': false };
+        const POST_MORTEM_TASKS = { 'Reposition body & remove lines/tubes': false, 'Complete documentation': false, 'Determine expected/unexpected death': false, 'Contact Coroner (if unexpected)': false, 'Follow local body handling procedure': false, 'Provide leaflet to bereaved relatives': false, 'Consider organ/tissue donation': false };
         const OTHER_DRUGS = ['Adenosine', 'Atropine', 'Adrenaline 1:1000', 'Adrenaline 1:10,000', 'Amiodarone (Further Dose)', 'Calcium chloride', 'Glucose', 'Hartmann’s solution', 'Magnesium sulphate', 'Midazolam', 'Naloxone', 'Potassium chloride', 'Sodium bicarbonate', 'Sodium chloride', 'Tranexamic acid'];
         const CPR_CYCLE_SECONDS = 120;
         const ADRENALINE_INTERVAL_SECONDS = 240;
@@ -75,8 +76,7 @@
         const MusicNoteIcon = () => React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', className: 'h-8 w-8', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', strokeWidth: 2, d: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z' }));
         const CheckCircleIcon = ({ checked, status }) => {
             let colorClass = 'text-slate-600';
-            if (checked && status === 'normothermic') colorClass = 'text-green-400';
-            else if (status === 'severe') colorClass = 'text-blue-400';
+            if (status === 'severe') colorClass = 'text-blue-400';
             else if (status === 'moderate') colorClass = 'text-yellow-400';
             else if (checked) colorClass = 'text-green-400';
 
@@ -86,7 +86,8 @@
         const LungsIcon = () => React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', className: 'h-5 w-5 mr-2 inline-block', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', strokeWidth: "2" }, React.createElement(React.Fragment, null, React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M6 21V12a6 6 0 1112 0v9' }), React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M12 12V3' }), React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M8 8l-2-2' }), React.createElement('path', { strokeLinecap: 'round', strokeLinejoin: 'round', d: 'M16 8l2-2' })));
         const IosShareIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-8 w-8 mx-auto mb-1 text-blue-500", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "1.5" }, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" }));
         const AndroidMenuIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-8 w-8 mx-auto mb-1", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" }, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" }));
-        
+        const ExternalLinkIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-4 w-4 ml-1.5 inline-block", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "2" }, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" }));
+
         // --- CORE APPLICATION LOGIC ---
         const formatTime = (timeInSeconds) => {
             const minutes = Math.floor(timeInSeconds / 60).toString().padStart(2, '0');
@@ -94,8 +95,8 @@
             return `${minutes}:${seconds}`;
         };
 
-        const triggerHapticFeedback = () => {
-            if (navigator.vibrate) { navigator.vibrate(50); }
+        const triggerHapticFeedback = (duration = 50) => {
+            if (navigator.vibrate) { navigator.vibrate(duration); }
         };
 
         const initialState = {
@@ -105,13 +106,15 @@
             adrenalineCount: 0, amiodaroneCount: 0, lidocaineCount: 0,
             shockCount: 0, airwayPlaced: false, uiState: 'default',
             metronomeOn: false, reversibleCauses: { ...REVERSIBLE_CAUSES },
-            postRoscTasks: { ...POST_ROSC_TASKS }, antiarrhythmicGiven: null,
+            postRoscTasks: { ...POST_ROSC_TASKS }, 
+            postMortemTasks: { ...POST_MORTEM_TASKS },
+            antiarrhythmicGiven: null,
             previousState: null, shockCountOnAmiodarone1: null,
             timeOffset: 0,
         };
 
         const appReducer = (state, action) => {
-            if (state.arrestState === 'ENDED' && !['RESET', 'TOGGLE_METRONOME', 'UNDO'].includes(action.type)) {
+            if (state.arrestState === 'ENDED' && !['RESET', 'TOGGLE_METRONOME', 'UNDO', 'TOGGLE_POST_MORTEM_TASK'].includes(action.type)) {
                 return state;
             }
              if (state.arrestState === 'PENDING' && !['START_ARREST', 'RESET', 'ADD_TIME_OFFSET'].includes(action.type)) {
@@ -144,6 +147,9 @@
                     if (state.arrestState !== 'ACTIVE') return state;
                     
                     let newCprTime = CPR_CYCLE_SECONDS - (newTotalArrestTime - state.cprCycleStartTime);
+                    if (newCprTime > 0 && newCprTime <= 10) {
+                        triggerHapticFeedback(200);
+                    }
                     let events = state.events, cprCycleStartTime = state.cprCycleStartTime;
                     if (newCprTime < 0) {
                         newCprTime = CPR_CYCLE_SECONDS;
@@ -212,10 +218,14 @@
                     const updatedTasks = { ...state.postRoscTasks, [action.payload]: !state.postRoscTasks[action.payload] };
                     const taskMessage = `Post-ROSC Care: ${action.payload} ${updatedTasks[action.payload] ? 'completed' : 'unchecked'}.`;
                     return { ...state, previousState: state, postRoscTasks: updatedTasks, events: [...state.events, newEvent(taskMessage, 'status')] };
+                case 'TOGGLE_POST_MORTEM_TASK':
+                    const updatedMortemTasks = { ...state.postMortemTasks, [action.payload]: !state.postMortemTasks[action.payload] };
+                    const mortemTaskMessage = `Post-Mortem Care: ${action.payload} ${updatedMortemTasks[action.payload] ? 'completed' : 'unchecked'}.`;
+                    return { ...state, previousState: state, postMortemTasks: updatedMortemTasks, events: [...state.events, newEvent(mortemTaskMessage, 'status')] };
                 case 'UNDO':
                     return state.previousState || state;
                 case 'RESET':
-                    return { ...initialState, reversibleCauses: { ...REVERSIBLE_CAUSES }, postRoscTasks: { ...POST_ROSC_TASKS }};
+                    return { ...initialState, reversibleCauses: { ...REVERSIBLE_CAUSES }, postRoscTasks: { ...POST_ROSC_TASKS }, postMortemTasks: { ...POST_MORTEM_TASKS }};
                 default:
                     return state;
             }
@@ -248,12 +258,17 @@
             if (lastAdrenalineTime === null) return null;
             const timeSince = masterTime - lastAdrenalineTime;
             const timeRemaining = interval - timeSince;
-            if (timeRemaining <= 0) return React.createElement(AdrenalineDueWarning);
+            if (timeRemaining <= 0) {
+                triggerHapticFeedback(500);
+                return React.createElement(AdrenalineDueWarning);
+            }
             return React.createElement('div', { className: 'bg-gray-700 border border-gray-600 rounded-lg p-3 text-center flex items-center justify-center shadow-md' }, React.createElement(SyringeIcon), React.createElement('span', { className: 'text-lg font-semibold text-slate-200 ml-3' }, 'Adrenaline due in: ', React.createElement('span', { className: 'font-mono text-xl' }, formatTime(timeRemaining))));
         };
         const AdrenalineDueWarning = () => React.createElement('div', { className: 'bg-red-600/90 border-2 border-red-500 rounded-lg p-3 text-center animate-pulse flex items-center justify-center shadow-lg' }, React.createElement(SyringeIcon), React.createElement('span', { className: 'text-xl font-bold text-white ml-3' }, 'Adrenaline Due'));
-        const AmiodaroneReminder = () => React.createElement('div', { className: 'bg-purple-800/50 border border-purple-600 rounded-lg p-3 text-center flex items-center justify-center shadow-md animate-pulse-purple' }, React.createElement(SyringeIcon), React.createElement('span', { className: 'text-lg font-semibold text-slate-200 ml-3' }, 'Consider 2nd Amiodarone Dose'));
-        
+        const AmiodaroneReminder = () => {
+            triggerHapticFeedback(500);
+            return React.createElement('div', { className: 'bg-purple-800/50 border border-purple-600 rounded-lg p-3 text-center flex items-center justify-center shadow-md animate-pulse-purple' }, React.createElement(SyringeIcon), React.createElement('span', { className: 'text-lg font-semibold text-slate-200 ml-3' }, 'Consider 2nd Amiodarone Dose'));
+        };
         const ActionButton = ({ children, className = '', disabled = false, largeText = false, ...props }) => {
             const finalClassName = `w-full h-20 flex flex-col items-center justify-center p-2 text-center rounded-xl shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:bg-slate-700 ${largeText ? 'text-xl' : 'text-md'} font-semibold ${className}`;
             const handleClick = (e) => { if (!disabled && props.onClick) { triggerHapticFeedback(); props.onClick(e); } };
@@ -266,7 +281,9 @@
                 React.createElement('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3' }, 
                     Object.entries(items).map(([item, value]) => {
                         const isHypothermia = item === 'Hypothermia';
-                        const isChecked = isHypothermia ? value !== 'normothermic' : value;
+                        const isChecked = isHypothermia ? value !== false : value;
+                        const isCrossedOut = isHypothermia ? value === 'normothermic' : value;
+
                         let statusText = '';
                         if (isHypothermia) {
                             if (value === 'severe') statusText = ': Severe';
@@ -275,11 +292,11 @@
                         
                         return React.createElement('div', { 
                             key: item, 
-                            onClick: () => isHypothermia ? onHypothermiaClick() : onToggle(item), 
+                            onClick: () => isHypothermia && onHypothermiaClick ? onHypothermiaClick() : onToggle(item), 
                             className: 'flex items-center cursor-pointer p-2 -m-2 rounded-md hover:bg-gray-700/50' 
                         }, 
                             React.createElement(CheckCircleIcon, { checked: isChecked, status: isHypothermia ? value : null }), 
-                            React.createElement('span', { className: `transition-colors ${isChecked && !isHypothermia ? 'line-through text-slate-500' : 'text-slate-300'}` }, item + statusText)
+                            React.createElement('span', { className: `transition-colors ${isCrossedOut ? 'line-through text-slate-500' : 'text-slate-300'}` }, item + statusText)
                         );
                     })
                 )
@@ -312,7 +329,7 @@
             const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
             const iosInstructions = React.createElement('div', { className: "text-center" }, React.createElement('p', { className: "text-lg" }, "To install this app on your device:"), React.createElement('p', { className: "mt-4" }, "1. Tap the ", React.createElement('strong', null, "Share"), " icon in your browser."), React.createElement(IosShareIcon, null), React.createElement('p', { className: "mt-2" }, "2. Scroll down and tap on"), React.createElement('p', { className: "font-bold mt-1" }, '"Add to Home Screen".'));
             const androidInstructions = React.createElement('div', { className: "text-center" }, React.createElement('p', { className: "text-lg" }, "To install this app on your device:"), React.createElement('p', { className: "mt-4" }, "1. Tap the ", React.createElement('strong', null, "Menu"), " button (3 dots) in your browser."), React.createElement(AndroidMenuIcon, null), React.createElement('p', { className: "mt-2" }, "2. Tap on"), React.createElement('p', { className: "font-bold mt-1" }, '"Install app" or "Add to Home Screen".'));
-            return React.createElement('div', { className: "fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center p-4 z-50 text-slate-200" }, React.createElement('div', { className: "bg-gray-800 rounded-xl shadow-xl w-full max-w-sm border border-gray-700 p-6" }, React.createElement('img', { src: "https://145955222.fs1.hubspotusercontent-eu1.net/hubfs/145955222/eResus.jpg", className: "w-24 h-24 mx-auto rounded-3xl mb-4" }), React.createElement('h2', { className: "text-2xl font-bold text-center mb-4" }, "Welcome to eResus"), isIos ? iosInstructions : androidInstructions, React.createElement('button', { onClick: onClose, className: "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg mt-6" }, "Continue to App")));
+            return React.createElement('div', { className: "fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center p-4 z-50 text-slate-200" }, React.createElement('div', { className: "bg-gray-800 rounded-xl shadow-xl w-full max-w-sm border border-gray-700 p-6" }, React.createElement('img', { src: "https://14555222.fs1.hubspotusercontent-eu1.net/hubfs/14555222/eResus.jpg", className: "w-24 h-24 mx-auto rounded-3xl mb-4" }), React.createElement('h2', { className: "text-2xl font-bold text-center mb-4" }, "Welcome to eResus"), isIos ? iosInstructions : androidInstructions, React.createElement('button', { onClick: onClose, className: "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg mt-6" }, "Continue to App")));
         };
         
         const HypothermiaModal = ({ onClose, onConfirm }) => {
@@ -344,6 +361,59 @@
                 React.createElement('button', { onClick: () => dispatch({ type: 'ADD_TIME_OFFSET', payload: 600 }), className: 'px-2 py-0.5 text-xs font-semibold text-white bg-slate-600 hover:bg-slate-500 rounded' }, '+10m')
             );
         };
+        
+        const AlgorithmCard = ({ title, href, imgSrc }) => {
+            return React.createElement('a', { 
+                href, 
+                target: '_blank', 
+                rel: 'noopener noreferrer', 
+                className: 'block bg-gray-800 p-4 rounded-lg text-center hover:bg-gray-700 transition-colors shadow-md border border-gray-700' 
+            },
+                React.createElement('img', { src: imgSrc, alt: title, className: 'w-full rounded-md mb-3 border-2 border-gray-600' }),
+                React.createElement('h3', { className: 'font-semibold text-slate-200' }, title),
+                React.createElement('p', { className: 'text-sm text-blue-400 mt-2 font-medium flex items-center justify-center' }, 'View Algorithm', React.createElement(ExternalLinkIcon))
+            );
+        };
+
+        const ResuscitationCouncilAlgorithms = ({ arrestState }) => {
+            const isRosc = arrestState === 'ROSC';
+            const isEnded = arrestState === 'ENDED';
+            if (isEnded) return null; // Don't show algorithms on the ended screen
+
+            const renderRoscAlgorithm = () => {
+                return React.createElement(AlgorithmCard, {
+                    title: 'Post Cardiac Arrest Rehabilitation',
+                    href: 'https://www.resus.org.uk/sites/default/files/2023-08/Post%20cardiac%20arrest%20rehabilitation%20algorithim%202023.pdf',
+                    imgSrc: 'https://www.resus.org.uk/sites/default/files/2023-08/Post%20cardiac%20arrest%20rehabilitation%20algorithim%202023.png'
+                });
+            };
+
+             const renderAlsAlgorithms = () => {
+                return React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-4' },
+                    React.createElement(AlgorithmCard, {
+                        title: 'Adult ALS Algorithm',
+                        href: 'https://www.resus.org.uk/sites/default/files/2024-01/Adult%20Advanced%20Life%20Support%20Algorithm%202021%20Aug%202023.pdf',
+                        imgSrc: 'https://www.resus.org.uk/sites/default/files/2021-04/als-algorithm-2021-1-724x1024.jpg'
+                    }),
+                    React.createElement(AlgorithmCard, {
+                        title: 'Paediatric ALS Algorithm',
+                        href: 'https://www.resus.org.uk/sites/default/files/2021-04/Paediatric%20ALS%20Algorithm%202021.pdf',
+                        imgSrc: 'https://www.resus.org.uk/sites/default/files/2021-04/pals-algorithm-2021-724x1024.jpg'
+                    }),
+                    React.createElement(AlgorithmCard, {
+                        title: 'Newborn Life Support',
+                        href: 'https://www.resus.org.uk/sites/default/files/2021-05/Newborn%20Life%20Support%20Algorithm%202021.pdf',
+                        imgSrc: 'https://www.resus.org.uk/sites/default/files/2021-04/nls-algorithm-2021-724x1024.jpg'
+                    })
+                );
+             };
+
+            return React.createElement('div', { className: 'bg-gray-800/50 rounded-lg p-4' },
+                React.createElement('h2', { className: 'text-lg font-bold mb-4 text-slate-200' }, isRosc ? 'Post-Resuscitation Care Guideline' : 'Resuscitation Council UK Algorithms'),
+                isRosc ? renderRoscAlgorithm() : renderAlsAlgorithms()
+            );
+        };
+
 
         // --- MAIN APP COMPONENT ---
         const App = () => {
@@ -437,8 +507,13 @@
                             state.arrestState === 'ROSC' ? React.createElement(React.Fragment, null, React.createElement(ActionSection, { title: 'Patient Status' }, React.createElement(ActionButton, { onClick: () => dispatch({ type: 'RE_ARREST'}), className: 'bg-amber-600 hover:bg-amber-700 text-white col-span-2' }, React.createElement(HeartPulseIcon), ' Patient Re-Arrested')), React.createElement(ActionSection, { title: 'Post-ROSC Medications' }, React.createElement(ActionButton, { onClick: () => setShowOtherDrugsModal(true), className: 'bg-slate-600 hover:bg-slate-500 text-white col-span-2' }, 'Administer Medication')), React.createElement(Checklist, { title: 'Post-ROSC Care', items: state.postRoscTasks, onToggle: (task) => dispatch({type: 'TOGGLE_POST_ROSC_TASK', payload: task}) })) : (state.arrestState === 'ACTIVE' ? renderActiveArrestActions() : null)
                         ),
                         
-                        state.arrestState !== 'ROSC' && React.createElement(Checklist, { title: "4 H's & 4 T's", items: state.reversibleCauses, onToggle: (cause) => dispatch({ type: 'TOGGLE_REVERSIBLE_CAUSE', payload: cause }), onHypothermiaClick: () => setShowHypothermiaModal(true) }),
-                        React.createElement('div', { className: 'bg-gray-800/50 rounded-lg p-4 h-72 flex flex-col' }, React.createElement('h2', { className: 'text-lg font-bold mb-2 flex-shrink-0 text-slate-200' }, 'Event Log'), React.createElement('div', { ref: logContainerRef, className: 'overflow-y-auto flex-grow pr-2' }, React.createElement('ul', { className: 'space-y-2 text-base' }, state.events.slice().reverse().map((event, index) => React.createElement('li', { key: index, className: 'flex items-baseline' }, React.createElement('span', { className: `font-mono mr-3 ${getLogColorClass(event.type)}` }, `[${formatTime(event.timestamp)}]`), React.createElement('span', { className: 'text-slate-300' }, event.message))))))
+                        state.arrestState === 'ENDED' 
+                            ? React.createElement(Checklist, { title: 'Actions Following Death', items: state.postMortemTasks, onToggle: (task) => dispatch({ type: 'TOGGLE_POST_MORTEM_TASK', payload: task })}) 
+                            : (state.arrestState !== 'ROSC' && React.createElement(Checklist, { title: "4 H's & 4 T's", items: state.reversibleCauses, onToggle: (cause) => dispatch({ type: 'TOGGLE_REVERSIBLE_CAUSE', payload: cause }), onHypothermiaClick: () => setShowHypothermiaModal(true) })),
+                        
+                        React.createElement('div', { className: 'bg-gray-800/50 rounded-lg p-4 h-72 flex flex-col' }, React.createElement('h2', { className: 'text-lg font-bold mb-2 flex-shrink-0 text-slate-200' }, 'Event Log'), React.createElement('div', { ref: logContainerRef, className: 'overflow-y-auto flex-grow pr-2' }, React.createElement('ul', { className: 'space-y-2 text-base' }, state.events.slice().reverse().map((event, index) => React.createElement('li', { key: index, className: 'flex items-baseline' }, React.createElement('span', { className: `font-mono mr-3 ${getLogColorClass(event.type)}` }, `[${formatTime(event.timestamp)}]`), React.createElement('span', { className: 'text-slate-300' }, event.message)))))),
+
+                        React.createElement(ResuscitationCouncilAlgorithms, { arrestState: state.arrestState })
                     )
                 ),
                 
