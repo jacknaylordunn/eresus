@@ -46,20 +46,17 @@
         import React, { useReducer, useEffect, useRef, useState } from 'https://esm.sh/react@18.2.0';
         import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
 
-        // Your main script (e.g., in index.html or another .js file)
+        // --- SERVICE WORKER REGISTRATION FOR OFFLINE CAPABILITY ---
         const registerServiceWorker = () => {
-        if ('serviceWorker' in navigator) {
+          if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-                console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            })
-            .catch((error) => {
-                console.error(`Service worker registration failed: ${error}`);
-            });
-        }
+              .then(registration => console.log('ServiceWorker registration successful with scope: ', registration.scope))
+              .catch(err => console.log('ServiceWorker registration failed: ', err));
+          }
         };
         
         registerServiceWorker();
+
 
         // --- TYPES AND CONSTANTS ---
         const REVERSIBLE_CAUSES = { Hypoxia: false, Hypovolemia: false, 'Hypo/Hyperkalaemia': false, Hypothermia: 'normothermic', Toxins: false, Tamponade: false, 'Tension Pneumothorax': false, Thrombosis: false };
