@@ -1,4 +1,4 @@
-const CACHE_NAME = 'eresus-cache-v10';
+const CACHE_NAME = 'eresus-cache-v11';
 const urlsToCache = [
   '/',
   'https://cdn.tailwindcss.com',
@@ -12,6 +12,9 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', event => {
+  // Force the waiting service worker to become the active service worker.
+  self.skipWaiting();
+
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -61,6 +64,9 @@ self.addEventListener('activate', event => {
           }
         })
       );
+    }).then(() => {
+      // Tell the active service worker to take control of the page immediately.
+      return self.clients.claim();
     })
   );
 });
