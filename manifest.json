@@ -1,0 +1,17 @@
+{
+  "name": "eResus",
+  "short_name": "eResus",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#112D46",
+  "description": "A clinical scribe for out-of-hospital cardiac arrests.",
+  "icons": [
+    {
+      "src": "https://145955222.fs1.hubspotusercontent-eu1.net/hubfs/145955222/eResus.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
